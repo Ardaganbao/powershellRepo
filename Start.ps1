@@ -49,10 +49,14 @@ $ProgressPreference = "SilentlyContinue"
 Set-StrictMode -Version Latest
 
 # Raise this when you change Start.ps1 so you can see which version a computer runs.
-$StartVersion = "1.1"
+$StartVersion = "1.2"
 
-# Shown once per run; the restart after a self-update skips it.
-if (-not $SelfUpdated) {
+# Shown once per run; the restart after a self-update confirms the new version instead.
+if ($SelfUpdated) {
+    Write-Host "Restarted with Start.ps1 v$StartVersion." -ForegroundColor Green
+    Write-Host ""
+}
+else {
     Write-Host ""
     Write-Host "Welcome to powershellRepo v$StartVersion, $env:USERNAME!" -ForegroundColor Cyan
     if (-not $SkipUpdate) {
