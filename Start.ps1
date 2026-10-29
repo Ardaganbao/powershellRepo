@@ -64,8 +64,36 @@ if ($InstalledCommit) {
     $versionLabel = $InstalledCommit.Substring(0, 7)
 }
 
-# onIT logo: a teal pill with "on" and a white circle with "IT".
-$Logo = @(
+# onIT logo as pixels: T = teal, W = white, N = navy, . = background.
+# Each console line shows two pixel rows using half-block characters.
+$LogoPixels = @(
+    '.......TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT.......',
+    '.....TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTWWWWTTTT.....',
+    '...TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTWWWWWWWWTTTT...',
+    '..TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTWWWWWWWWWWWWTTT..',
+    '..TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTWWWWWWWWWWWWWWTT..',
+    '.TTTTTTTTTTTTWWWWWTTTTTWWWTWWWWWTTTTTTTTTTWWWWWWWWWWWWWWTTT.',
+    '.TTTTTTTTTTWWWWWWWWWTTTWWWWWWWWWWTTTTTTTTWWNNNWNNNNNNNNNWTT.',
+    'TTTTTTTTTTWWWWTTTWWWWTTWWWWWTTWWWWTTTTTTTWWNNNWNNNNNNNNNWTTT',
+    'TTTTTTTTTTWWWTTTTTWWWTTWWWTTTTTWWWTTTTTTWWWNNNWWWWNNNWWWWWTT',
+    'TTTTTTTTTTWWWTTTTTWWWTTWWWTTTTTWWWTTTTTTWWWNNNWWWWNNNWWWWWTT',
+    'TTTTTTTTTTWWWTTTTTWWWTTWWWTTTTTWWWTTTTTTWWWNNNWWWWNNNWWWWWTT',
+    'TTTTTTTTTTWWWTTTTTWWWTTWWWTTTTTWWWTTTTTTWWWNNNWWWWNNNWWWWWTT',
+    'TTTTTTTTTTWWWWTTTWWWWTTWWWTTTTTWWWTTTTTTTWWNNNWWWWNNNWWWWTTT',
+    '.TTTTTTTTTTWWWWWWWWWTTTWWWTTTTTWWWTTTTTTTWWNNNWWWWNNNWWWWTT.',
+    '.TTTTTTTTTTTTWWWWWTTTTTWWWTTTTTWWWTTTTTTTTWWWWWWWWWWWWWWTTT.',
+    '..TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTWWWWWWWWWWWWWWTT..',
+    '..TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTWWWWWWWWWWWWTTT..',
+    '...TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTWWWWWWWWTTTT...',
+    '.....TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTWWWWTTTT.....',
+    '.......TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT.......'
+)
+
+# Brand colours as "R;G;B" for 24-bit console colour codes.
+$LogoColors = @{ T = "108;192;194"; W = "255;255;255"; N = "26;43;73" }
+
+# Plain-text logo for consoles without 24-bit colour (e.g. PowerShell ISE).
+$AsciiLogo = @(
     '    __________________________________________ ',
     '   /                         _____________    \',
     '  |      ___  _ __          /  ___ _____  \    |',
@@ -77,17 +105,64 @@ $Logo = @(
 )
 
 function Write-Logo {
-    for ($row = 0; $row -lt $Logo.Count; $row++) {
-        $line = $Logo[$row].PadRight(48)
+    $supportsColor = -not [Console]::IsOutputRedirected -and
+        $Host.UI.PSObject.Properties["SupportsVirtualTerminal"] -and $Host.UI.SupportsVirtualTerminal
 
-        if ($row -eq 0 -or $row -eq $Logo.Count - 1) {
+    if ($supportsColor) {
+        Write-PixelLogo
+    }
+    else {
+        Write-AsciiLogo
+    }
+}
+
+function Write-PixelLogo {
+    # Characters are built at run time so this file stays plain ASCII for Windows PowerShell 5.1.
+    $esc = [char]27
+    $upperHalf = [char]0x2580
+    $lowerHalf = [char]0x2584
+
+    for ($y = 0; $y -lt $LogoPixels.Count; $y += 2) {
+        $top = $LogoPixels[$y]
+        $bottom = $LogoPixels[$y + 1]
+        $line = New-Object System.Text.StringBuilder
+        [void]$line.Append("  ")
+
+        for ($x = 0; $x -lt $top.Length; $x++) {
+            $upper = [string]$top[$x]
+            $lower = [string]$bottom[$x]
+
+            if ($upper -eq "." -and $lower -eq ".") {
+                [void]$line.Append("$esc[0m ")
+            }
+            elseif ($lower -eq ".") {
+                [void]$line.Append("$esc[0;38;2;$($LogoColors[$upper])m$upperHalf")
+            }
+            elseif ($upper -eq ".") {
+                [void]$line.Append("$esc[0;38;2;$($LogoColors[$lower])m$lowerHalf")
+            }
+            else {
+                [void]$line.Append("$esc[38;2;$($LogoColors[$upper]);48;2;$($LogoColors[$lower])m$upperHalf")
+            }
+        }
+
+        [void]$line.Append("$esc[0m")
+        Write-Host $line.ToString()
+    }
+}
+
+function Write-AsciiLogo {
+    for ($row = 0; $row -lt $AsciiLogo.Count; $row++) {
+        $line = $AsciiLogo[$row].PadRight(48)
+
+        if ($row -eq 0 -or $row -eq $AsciiLogo.Count - 1) {
             Write-Host $line -ForegroundColor DarkCyan
             continue
         }
 
         # Columns: pill | "on" | pill | circle | "IT" (circle edge on its first and last row) | circle | pill
         $itColor = "Blue"
-        if ($row -eq 1 -or $row -eq $Logo.Count - 2) {
+        if ($row -eq 1 -or $row -eq $AsciiLogo.Count - 2) {
             $itColor = "White"
         }
 
@@ -109,8 +184,11 @@ if ($UpdatesApplied -or $SelfUpdated) {
 }
 else {
     Write-Host ""
-    Write-Logo
-    Write-Host ""
+    # Skipped for -UpdateOnly, whose output the Script Manager shows as plain text.
+    if (-not $UpdateOnly) {
+        Write-Logo
+        Write-Host ""
+    }
     Write-Host "Welcome to powershellRepo (version $versionLabel), $env:USERNAME!" -ForegroundColor Cyan
     Write-Host "This keeps your scripts up to date from GitHub and runs the ones that are turned on."
     Write-Host ""
