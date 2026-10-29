@@ -1,15 +1,5 @@
 [CmdletBinding()]
-param(
-    [switch]$Update
-)
+param()
 
-$Updater = Join-Path $PSScriptRoot "Update-FromGitHub.ps1"
-
-if ($Update) {
-    # Repository details and file list come from updater.config.json.
-    & $Updater -TargetFolder $PSScriptRoot
-    exit
-}
-
+# Run this through Start.ps1 so it is updated from GitHub first.
 Write-Host "Sample script is running."
-Write-Host "Use -Update to download the latest version from GitHub."

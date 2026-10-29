@@ -4,9 +4,36 @@ This project includes a small PowerShell updater that downloads the latest versi
 
 ## Files
 
+- `Start.ps1` - The entry point. Updates itself and the other scripts, then runs `SampleScript.ps1`.
 - `Update-FromGitHub.ps1` - Downloads files from GitHub.
 - `updater.config.json` - Which GitHub repository, branch and files to update from.
-- `SampleScript.ps1` - Example script that can self-update.
+- `SampleScript.ps1` - The main script (put your work here).
+
+## Run it
+
+```powershell
+.\Start.ps1
+```
+
+Every run:
+
+1. Downloads the latest `Start.ps1`. If it changed, it replaces itself and restarts with the new version.
+2. Downloads the latest `Update-FromGitHub.ps1` and `updater.config.json`, then every file listed in `Files`.
+3. Runs `SampleScript.ps1`.
+
+If GitHub can't be reached, it shows a warning and runs the local versions. Use `.\Start.ps1 -SkipUpdate` to run without checking for updates.
+
+### Install on a new computer
+
+Only `Start.ps1` is needed; it downloads everything else on the first run:
+
+```powershell
+mkdir C:\Scripts; cd C:\Scripts
+Invoke-WebRequest https://raw.githubusercontent.com/Ardaganbao/powershellRepo/main/Start.ps1 -OutFile Start.ps1
+.\Start.ps1
+```
+
+To add a script, put it in the repository and add its name to `Files` in `updater.config.json`.
 
 ## Configure it
 
@@ -18,7 +45,7 @@ This project includes a small PowerShell updater that downloads the latest versi
     "Owner": "your-github-user",
     "Repository": "your-repository",
     "Branch": "main",
-    "Files": ["SampleScript.ps1", "Update-FromGitHub.ps1"]
+    "Files": ["Start.ps1", "SampleScript.ps1", "Update-FromGitHub.ps1"]
 }
 ```
 
@@ -50,12 +77,6 @@ Files that already match GitHub are skipped. Add `-Force` to overwrite them anyw
 ```
 
 The first `.zip` or `.ps1` asset of the latest release is used. If there is no release, the configured files are downloaded from the branch instead.
-
-## Example local script self-update
-
-```powershell
-.\SampleScript.ps1 -Update
-```
 
 ## Passwords and secrets
 

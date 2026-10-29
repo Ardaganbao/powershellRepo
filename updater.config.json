@@ -4,6 +4,7 @@
     "Branch": "main",
     "TokenSecretName": "",
     "Files": [
+        "Start.ps1",
         "SampleScript.ps1",
         "Update-FromGitHub.ps1"
     ]
