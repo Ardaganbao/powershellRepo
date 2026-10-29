@@ -236,21 +236,31 @@ function Update-RepoFile {
     )
 
     $repoPath = $Name -replace '\\', '/'
-    if (-not $RemoteHashes.ContainsKey($repoPath)) {
-        Write-Warning "$Name is not in the repository."
-        return $false
-    }
-
     $destination = Join-Path $PSScriptRoot $Name
-    if ((Test-Path $destination) -and (Get-GitBlobHash $destination) -eq $RemoteHashes[$repoPath]) {
-        return $false
+
+    # With the API's file hashes, skip unchanged files without downloading them.
+    if ($RemoteHashes) {
+        if (-not $RemoteHashes.ContainsKey($repoPath)) {
+            Write-Warning "$Name is not in the repository."
+            return $false
+        }
+
+        if ((Test-Path $destination) -and (Get-GitBlobHash $destination) -eq $RemoteHashes[$repoPath]) {
+            return $false
+        }
     }
 
     $tempFile = [System.IO.Path]::GetTempFileName()
 
     try {
-        # Download from the exact commit so a just-pushed change is never served stale.
-        Invoke-WebRequest -Uri "https://raw.githubusercontent.com/$Owner/$Repository/$CommitSha/$repoPath" -OutFile $tempFile -UseBasicParsing -Headers $Headers
+        # Download from the exact commit when known, so a just-pushed change is never served stale.
+        Invoke-WebRequest -Uri "https://raw.githubusercontent.com/$Owner/$Repository/$DownloadRef/$repoPath" -OutFile $tempFile -UseBasicParsing -Headers $Headers
+
+        # Without the API's hashes, compare the download with the local file instead.
+        if (-not $RemoteHashes -and (Test-Path $destination) -and
+            (Get-FileHash $tempFile).Hash -eq (Get-FileHash $destination).Hash) {
+            return $false
+        }
 
         $destinationFolder = Split-Path -Parent $destination
         if (-not (Test-Path $destinationFolder)) {
@@ -272,11 +282,21 @@ if (-not $SkipUpdate -and -not $UpdatesApplied) {
     try {
         # Ask GitHub for the latest commit and the hash of every file in it,
         # so only the files that changed are downloaded.
-        $commit = Invoke-RestMethod -Uri "$ApiBase/commits/$Branch" -Headers $Headers
-        $CommitSha = $commit.sha
-        $tree = Invoke-RestMethod -Uri "$ApiBase/git/trees/${CommitSha}?recursive=1" -Headers $Headers
-        $RemoteHashes = @{}
-        $tree.tree | Where-Object { $_.type -eq "blob" } | ForEach-Object { $RemoteHashes[$_.path] = $_.sha }
+        try {
+            $commit = Invoke-RestMethod -Uri "$ApiBase/commits/$Branch" -Headers $Headers
+            $tree = Invoke-RestMethod -Uri "$ApiBase/git/trees/$($commit.sha)?recursive=1" -Headers $Headers
+            $RemoteHashes = @{}
+            $tree.tree | Where-Object { $_.type -eq "blob" } | ForEach-Object { $RemoteHashes[$_.path] = $_.sha }
+            $DownloadRef = $commit.sha
+        }
+        catch {
+            # The API allows 60 requests an hour per network without a token; plain file
+            # downloads have no such limit, so compare the files directly instead.
+            Write-Host "GitHub API unavailable ($($_.Exception.Message)), comparing files directly." -ForegroundColor DarkGray
+            $commit = $null
+            $RemoteHashes = $null
+            $DownloadRef = $Branch
+        }
 
         # 1. Download every update first: this script, the config, then every file it lists.
         $restart = -not $SelfUpdated -and (Update-RepoFile -Name (Split-Path -Leaf $PSCommandPath))
@@ -288,16 +308,19 @@ if (-not $SkipUpdate -and -not $UpdatesApplied) {
             Write-Host "Everything is up to date."
         }
 
-        $date = ([datetime]$commit.commit.committer.date).ToLocalTime().ToString("yyyy-MM-dd HH:mm")
-        $message = ($commit.commit.message -split "`n")[0]
-        $versionText = "version $($CommitSha.Substring(0, 7)) ($date): $message"
+        # The version comes from the API, so it is only known when the API answered.
+        if ($commit) {
+            $date = ([datetime]$commit.commit.committer.date).ToLocalTime().ToString("yyyy-MM-dd HH:mm")
+            $message = ($commit.commit.message -split "`n")[0]
+            $versionText = "version $($commit.sha.Substring(0, 7)) ($date): $message"
 
-        if ($CommitSha -ne $InstalledCommit) {
-            Set-Content -Path $VersionPath -Value $CommitSha -Encoding ascii
-            Write-Host "Updated to $versionText" -ForegroundColor Green
-        }
-        else {
-            Write-Host "Running $versionText" -ForegroundColor DarkGray
+            if ($commit.sha -ne $InstalledCommit) {
+                Set-Content -Path $VersionPath -Value $commit.sha -Encoding ascii
+                Write-Host "Updated to $versionText" -ForegroundColor Green
+            }
+            else {
+                Write-Host "Running $versionText" -ForegroundColor DarkGray
+            }
         }
         Write-Host ""
     }
