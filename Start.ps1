@@ -55,20 +55,22 @@ if (Test-Path $VersionPath) {
     $InstalledCommit = (Get-Content -Path $VersionPath -Raw).Trim()
 }
 
-$versionLabel = "version unknown"
-if ($InstalledCommit) {
-    $versionLabel = "version " + $InstalledCommit.Substring(0, 7)
-}
-
 # Shown once per run; the restart after a self-update confirms it instead.
+# The version is shown after the update check, so it is always the one actually running.
 if ($SelfUpdated) {
     Write-Host "Restarted with the new Start.ps1." -ForegroundColor Green
-    Write-Host ""
 }
 else {
     Write-Host ""
-    Write-Host "Welcome to powershellRepo ($versionLabel), $env:USERNAME!" -ForegroundColor Cyan
-    if (-not $SkipUpdate) {
+    Write-Host "Welcome to powershellRepo, $env:USERNAME!" -ForegroundColor Cyan
+    if ($SkipUpdate) {
+        $versionLabel = "unknown"
+        if ($InstalledCommit) {
+            $versionLabel = $InstalledCommit.Substring(0, 7)
+        }
+        Write-Host "Version $versionLabel (update check skipped)" -ForegroundColor DarkGray
+    }
+    else {
         Write-Host "Checking GitHub for updates..." -ForegroundColor DarkGray
     }
     Write-Host ""
@@ -160,12 +162,18 @@ if (-not $SkipUpdate) {
                 Write-Host "Everything is up to date."
             }
 
+            $date = ([datetime]$commit.commit.committer.date).ToLocalTime().ToString("yyyy-MM-dd HH:mm")
+            $message = ($commit.commit.message -split "`n")[0]
+            $versionText = "version $($CommitSha.Substring(0, 7)) ($date): $message"
+
             if ($CommitSha -ne $InstalledCommit) {
                 Set-Content -Path $VersionPath -Value $CommitSha -Encoding ascii
-                $date = ([datetime]$commit.commit.committer.date).ToLocalTime().ToString("yyyy-MM-dd HH:mm")
-                $message = ($commit.commit.message -split "`n")[0]
-                Write-Host "Now on version $($CommitSha.Substring(0, 7)) ($date): $message" -ForegroundColor Green
+                Write-Host "Updated to $versionText" -ForegroundColor Green
             }
+            else {
+                Write-Host "Running $versionText" -ForegroundColor DarkGray
+            }
+            Write-Host ""
         }
     }
     catch {
