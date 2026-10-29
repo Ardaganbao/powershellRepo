@@ -48,10 +48,13 @@ $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
 Set-StrictMode -Version Latest
 
+# Raise this when you change Start.ps1 so you can see which version a computer runs.
+$StartVersion = "1.1"
+
 # Shown once per run; the restart after a self-update skips it.
 if (-not $SelfUpdated) {
     Write-Host ""
-    Write-Host "Welcome to powershellRepo, $env:USERNAME!" -ForegroundColor Cyan
+    Write-Host "Welcome to powershellRepo v$StartVersion, $env:USERNAME!" -ForegroundColor Cyan
     if (-not $SkipUpdate) {
         Write-Host "Checking GitHub for updates..." -ForegroundColor DarkGray
     }
