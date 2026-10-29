@@ -66,6 +66,16 @@ $env:GITHUB_TOKEN = "github_pat_..."
 .\Update-FromGitHub.ps1
 ```
 
+## Never commit passwords
+
+This repository is public. Never put passwords, tokens or keys in the scripts; read them from environment variables instead (for example `$env:GITHUB_TOKEN`).
+
+A pre-commit hook blocks commits that look like they contain a secret. Enable it once in every clone:
+
+```powershell
+git config core.hooksPath .githooks
+```
+
 ## Notes
 
 - Keep the file names and folder layout the same on GitHub and locally.
