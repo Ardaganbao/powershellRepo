@@ -16,6 +16,14 @@ param(
     [Parameter()]
     [switch]$SkipUpdate,
 
+    # Only update the files; don't run any script.
+    [Parameter()]
+    [switch]$UpdateOnly,
+
+    # Open Manager.ps1 after updating instead of running the scripts.
+    [Parameter()]
+    [switch]$Gui,
+
     # Set internally when the script restarts after updating itself.
     [Parameter(DontShow)]
     [switch]$SelfUpdated
@@ -137,5 +145,35 @@ if (-not $SkipUpdate) {
     }
 }
 
-# 3. Run the main script.
-& (Join-Path $PSScriptRoot "SampleScript.ps1")
+if ($UpdateOnly) {
+    return
+}
+
+if ($Gui) {
+    & (Join-Path $PSScriptRoot "Manager.ps1")
+    return
+}
+
+# 3. Run every script in the config that is turned on; Manager.ps1 turns them on and off.
+$config = Get-Content -Path (Join-Path $PSScriptRoot "updater.config.json") -Raw | ConvertFrom-Json
+$statePath = Join-Path $PSScriptRoot "scripts.local.json"
+$turnedOff = @()
+if (Test-Path $statePath) {
+    $turnedOff = @((Get-Content -Path $statePath -Raw | ConvertFrom-Json).PSObject.Properties |
+        Where-Object { -not $_.Value } |
+        ForEach-Object { $_.Name })
+}
+
+foreach ($name in $config.Scripts) {
+    if ($turnedOff -contains $name) {
+        Write-Host "Skipped (turned off): $name"
+        continue
+    }
+
+    try {
+        & (Join-Path $PSScriptRoot $name)
+    }
+    catch {
+        Write-Warning "$name failed: $($_.Exception.Message)"
+    }
+}

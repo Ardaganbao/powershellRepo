@@ -5,7 +5,11 @@
     "TokenSecretName": "",
     "Files": [
         "Start.ps1",
+        "Manager.ps1",
         "SampleScript.ps1",
         "Update-FromGitHub.ps1"
+    ],
+    "Scripts": [
+        "SampleScript.ps1"
     ]
 }

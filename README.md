@@ -4,7 +4,8 @@ This project includes a small PowerShell updater that downloads the latest versi
 
 ## Files
 
-- `Start.ps1` - The entry point. Updates itself and the other scripts, then runs `SampleScript.ps1`.
+- `Start.ps1` - The entry point. Updates itself and the other scripts, then runs every script that is turned on.
+- `Manager.ps1` - Window to turn scripts on and off and run them on demand.
 - `Update-FromGitHub.ps1` - Downloads files from GitHub.
 - `updater.config.json` - Which GitHub repository, branch and files to update from.
 - `SampleScript.ps1` - The main script (put your work here).
@@ -20,11 +21,28 @@ Every run:
 1. Asks the GitHub API for the latest commit and the hash of every file in it, and compares them with the local files. Only files that are missing or changed are downloaded.
 2. If `Start.ps1` changed, it replaces itself and restarts with the new version.
 3. Updates `updater.config.json`, then every file listed in `Files`.
-4. Runs `SampleScript.ps1`.
+4. Runs every script listed in `Scripts` that is turned on (see below).
 
 If GitHub can't be reached, it shows a warning and runs the local versions. Use `.\Start.ps1 -SkipUpdate` to run without checking for updates.
 
 The check uses 2 GitHub API requests per run. GitHub allows 60 requests per hour per network without a token; above that the run continues with the local versions.
+
+### Turn scripts on/off and run them on demand
+
+```powershell
+.\Start.ps1 -Gui     # update, then open the Script Manager
+.\Manager.ps1        # open it without updating
+```
+
+- The list shows every script in `Scripts` in `updater.config.json`.
+- **Checked** = `Start.ps1` runs it automatically. Unchecked = skipped. This is saved per computer in `scripts.local.json`, which is not uploaded to GitHub.
+- **Run selected** (or double-click) runs a script now, whether it is on or off. **Run all turned on** runs every checked script.
+- **Check for updates** downloads changed files from GitHub and reloads the list.
+- Scripts run one after another in a hidden PowerShell window; their output appears at the bottom.
+
+To add a script to the manager, add its name to both `Files` and `Scripts` in `updater.config.json`.
+
+`.\Start.ps1 -UpdateOnly` only updates the files without running anything.
 
 ### Install and run with one line
 
