@@ -59,15 +59,59 @@ if (Test-Path $VersionPath) {
     $InstalledCommit = (Get-Content -Path $VersionPath -Raw).Trim()
 }
 
+$versionLabel = "unknown"
+if ($InstalledCommit) {
+    $versionLabel = $InstalledCommit.Substring(0, 7)
+}
+
+# onIT logo: a teal pill with "on" and a white circle with "IT".
+$Logo = @(
+    '    __________________________________________ ',
+    '   /                         _____________    \',
+    '  |      ___  _ __          /  ___ _____  \    |',
+    '  |     / _ \| ''_ \        |  |_ _|_   _|  |   |',
+    '  |    | (_) | | | |       |   | |  | |    |   |',
+    '  |     \___/|_| |_|       |  |___| |_|    |   |',
+    '   \                        \_____________/   / ',
+    '    \________________________________________/  '
+)
+
+function Write-Logo {
+    for ($row = 0; $row -lt $Logo.Count; $row++) {
+        $line = $Logo[$row].PadRight(48)
+
+        if ($row -eq 0 -or $row -eq $Logo.Count - 1) {
+            Write-Host $line -ForegroundColor DarkCyan
+            continue
+        }
+
+        # Columns: pill | "on" | pill | circle | "IT" (circle edge on its first and last row) | circle | pill
+        $itColor = "Blue"
+        if ($row -eq 1 -or $row -eq $Logo.Count - 2) {
+            $itColor = "White"
+        }
+
+        $parts = @(
+            @(0, 7, "DarkCyan"), @(7, 13, "White"), @(20, 7, "DarkCyan"),
+            @(27, 3, "White"), @(30, 11, $itColor), @(41, 3, "White"), @(44, 4, "DarkCyan")
+        )
+        foreach ($part in $parts) {
+            Write-Host $line.Substring($part[0], $part[1]) -ForegroundColor $part[2] -NoNewline
+        }
+        Write-Host ""
+    }
+}
+
 # Shown once per run; the restart after a self-update confirms it instead.
-# The version is shown after the update check, so it is always the one actually running.
 if ($UpdatesApplied -or $SelfUpdated) {
     Write-Host "Restarted with the new Start.ps1." -ForegroundColor Green
     Write-Host ""
 }
 else {
     Write-Host ""
-    Write-Host "Welcome to powershellRepo, $env:USERNAME!" -ForegroundColor Cyan
+    Write-Logo
+    Write-Host ""
+    Write-Host "Welcome to powershellRepo (version $versionLabel), $env:USERNAME!" -ForegroundColor Cyan
     Write-Host "This keeps your scripts up to date from GitHub and runs the ones that are turned on."
     Write-Host ""
     Write-Host "  .\Start.ps1 -Gui         Open the Script Manager to turn scripts on/off and run them" -ForegroundColor DarkGray
@@ -75,11 +119,7 @@ else {
     Write-Host "  .\Start.ps1 -SkipUpdate  Run without checking GitHub" -ForegroundColor DarkGray
     Write-Host ""
     if ($SkipUpdate) {
-        $versionLabel = "unknown"
-        if ($InstalledCommit) {
-            $versionLabel = $InstalledCommit.Substring(0, 7)
-        }
-        Write-Host "Version $versionLabel (update check skipped)" -ForegroundColor DarkGray
+        Write-Host "Update check skipped." -ForegroundColor DarkGray
     }
     else {
         Write-Host "Checking GitHub for updates..." -ForegroundColor DarkGray
