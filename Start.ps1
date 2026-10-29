@@ -51,21 +51,27 @@ function Update-RepoFile {
 }
 
 if (-not $SkipUpdate) {
-    try {
-        # 1. Update this script first and restart it if a newer version was downloaded.
-        if (-not $SelfUpdated -and (Update-RepoFile -Name (Split-Path -Leaf $PSCommandPath))) {
-            Write-Host "Entry point updated, restarting with the new version..."
-            & $PSCommandPath @PSBoundParameters -SelfUpdated
-            exit $LASTEXITCODE
-        }
+    $restart = $false
 
-        # 2. Get the latest updater and config, then let it update the other scripts.
-        Update-RepoFile -Name "Update-FromGitHub.ps1" | Out-Null
-        Update-RepoFile -Name "updater.config.json" | Out-Null
-        & (Join-Path $PSScriptRoot "Update-FromGitHub.ps1") -Owner $Owner -Repository $Repository -Branch $Branch -TargetFolder $PSScriptRoot
+    try {
+        # 1. Update this script first; the new version takes over from here.
+        $restart = -not $SelfUpdated -and (Update-RepoFile -Name (Split-Path -Leaf $PSCommandPath))
+
+        if (-not $restart) {
+            # 2. Get the latest updater and config, then let it update the other scripts.
+            Update-RepoFile -Name "Update-FromGitHub.ps1" | Out-Null
+            Update-RepoFile -Name "updater.config.json" | Out-Null
+            & (Join-Path $PSScriptRoot "Update-FromGitHub.ps1") -Owner $Owner -Repository $Repository -Branch $Branch -TargetFolder $PSScriptRoot
+        }
     }
     catch {
         Write-Warning "Update check failed, running the local version: $($_.Exception.Message)"
+    }
+
+    if ($restart) {
+        Write-Host "Entry point updated, restarting with the new version..."
+        & $PSCommandPath @PSBoundParameters -SelfUpdated
+        return
     }
 }
 
