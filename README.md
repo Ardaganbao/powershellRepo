@@ -17,11 +17,14 @@ This project includes a small PowerShell updater that downloads the latest versi
 
 Every run:
 
-1. Downloads the latest `Start.ps1`. If it changed, it replaces itself and restarts with the new version.
-2. Downloads the latest `Update-FromGitHub.ps1` and `updater.config.json`, then every file listed in `Files`.
-3. Runs `SampleScript.ps1`.
+1. Asks the GitHub API for the latest commit and the hash of every file in it, and compares them with the local files. Only files that are missing or changed are downloaded.
+2. If `Start.ps1` changed, it replaces itself and restarts with the new version.
+3. Updates `updater.config.json`, then every file listed in `Files`.
+4. Runs `SampleScript.ps1`.
 
 If GitHub can't be reached, it shows a warning and runs the local versions. Use `.\Start.ps1 -SkipUpdate` to run without checking for updates.
+
+The check uses 2 GitHub API requests per run. GitHub allows 60 requests per hour per network without a token; above that the run continues with the local versions.
 
 ### Install and run with one line
 

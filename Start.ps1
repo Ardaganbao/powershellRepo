@@ -40,25 +40,60 @@ $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
 Set-StrictMode -Version Latest
 
-$RawBase = "https://raw.githubusercontent.com/$Owner/$Repository/$Branch"
+$ApiBase = "https://api.github.com/repos/$Owner/$Repository"
+$Headers = @{ "User-Agent" = "PowerShell-Updater" }
 
-# Downloads one file from the repository; returns $true when the local copy changed.
+# Git's hash of a local file, the same value GitHub lists for each file in the repository.
+function Get-GitBlobHash {
+    param(
+        [string]$Path
+    )
+
+    $bytes = [System.IO.File]::ReadAllBytes($Path)
+    $header = [System.Text.Encoding]::ASCII.GetBytes("blob $($bytes.Length)`0")
+    $sha1 = [System.Security.Cryptography.SHA1]::Create()
+
+    try {
+        $sha1.TransformBlock($header, 0, $header.Length, $null, 0) | Out-Null
+        $sha1.TransformFinalBlock($bytes, 0, $bytes.Length) | Out-Null
+        return -join ($sha1.Hash | ForEach-Object { $_.ToString("x2") })
+    }
+    finally {
+        $sha1.Dispose()
+    }
+}
+
+# Downloads one file only when it is missing or differs from the repository;
+# returns $true when the local copy changed.
 function Update-RepoFile {
     param(
         [string]$Name
     )
 
+    $repoPath = $Name -replace '\\', '/'
+    if (-not $RemoteHashes.ContainsKey($repoPath)) {
+        Write-Warning "$Name is not in the repository."
+        return $false
+    }
+
     $destination = Join-Path $PSScriptRoot $Name
+    if ((Test-Path $destination) -and (Get-GitBlobHash $destination) -eq $RemoteHashes[$repoPath]) {
+        return $false
+    }
+
     $tempFile = [System.IO.Path]::GetTempFileName()
 
     try {
-        Invoke-WebRequest -Uri "$RawBase/$Name" -OutFile $tempFile -UseBasicParsing -Headers @{ "User-Agent" = "PowerShell-Updater" }
+        # Download from the exact commit so a just-pushed change is never served stale.
+        Invoke-WebRequest -Uri "https://raw.githubusercontent.com/$Owner/$Repository/$CommitSha/$repoPath" -OutFile $tempFile -UseBasicParsing -Headers $Headers
 
-        if ((Test-Path $destination) -and (Get-FileHash $tempFile).Hash -eq (Get-FileHash $destination).Hash) {
-            return $false
+        $destinationFolder = Split-Path -Parent $destination
+        if (-not (Test-Path $destinationFolder)) {
+            New-Item -ItemType Directory -Path $destinationFolder -Force | Out-Null
         }
 
         Copy-Item -Path $tempFile -Destination $destination -Force
+        Write-Host "Updated: $Name"
         return $true
     }
     finally {
@@ -70,14 +105,25 @@ if (-not $SkipUpdate) {
     $restart = $false
 
     try {
+        # Ask GitHub for the latest commit and the hash of every file in it,
+        # so only the files that changed are downloaded.
+        $CommitSha = Invoke-RestMethod -Uri "$ApiBase/commits/$Branch" -Headers ($Headers + @{ Accept = "application/vnd.github.sha" })
+        $tree = Invoke-RestMethod -Uri "$ApiBase/git/trees/${CommitSha}?recursive=1" -Headers $Headers
+        $RemoteHashes = @{}
+        $tree.tree | Where-Object { $_.type -eq "blob" } | ForEach-Object { $RemoteHashes[$_.path] = $_.sha }
+
         # 1. Update this script first; the new version takes over from here.
         $restart = -not $SelfUpdated -and (Update-RepoFile -Name (Split-Path -Leaf $PSCommandPath))
 
         if (-not $restart) {
-            # 2. Get the latest updater and config, then let it update the other scripts.
-            Update-RepoFile -Name "Update-FromGitHub.ps1" | Out-Null
-            Update-RepoFile -Name "updater.config.json" | Out-Null
-            & (Join-Path $PSScriptRoot "Update-FromGitHub.ps1") -Owner $Owner -Repository $Repository -Branch $Branch -TargetFolder $PSScriptRoot
+            # 2. Update the config, then every file it lists.
+            $configChanged = Update-RepoFile -Name "updater.config.json"
+            $config = Get-Content -Path (Join-Path $PSScriptRoot "updater.config.json") -Raw | ConvertFrom-Json
+            $changed = @($config.Files | Where-Object { Update-RepoFile -Name $_ })
+
+            if (-not $configChanged -and $changed.Count -eq 0) {
+                Write-Host "Everything is up to date."
+            }
         }
     }
     catch {
