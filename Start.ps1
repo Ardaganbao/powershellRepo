@@ -48,6 +48,16 @@ $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
 Set-StrictMode -Version Latest
 
+# Shown once per run; the restart after a self-update skips it.
+if (-not $SelfUpdated) {
+    Write-Host ""
+    Write-Host "Welcome to powershellRepo, $env:USERNAME!" -ForegroundColor Cyan
+    if (-not $SkipUpdate) {
+        Write-Host "Checking GitHub for updates..." -ForegroundColor DarkGray
+    }
+    Write-Host ""
+}
+
 $ApiBase = "https://api.github.com/repos/$Owner/$Repository"
 $Headers = @{ "User-Agent" = "PowerShell-Updater" }
 
