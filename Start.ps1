@@ -48,17 +48,26 @@ $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
 Set-StrictMode -Version Latest
 
-# Raise this when you change Start.ps1 so you can see which version a computer runs.
-$StartVersion = "1.2"
+# The version is the git commit this folder was last updated to (kept out of the repository, see .gitignore).
+$VersionPath = Join-Path $PSScriptRoot "installed-version.txt"
+$InstalledCommit = ""
+if (Test-Path $VersionPath) {
+    $InstalledCommit = (Get-Content -Path $VersionPath -Raw).Trim()
+}
 
-# Shown once per run; the restart after a self-update confirms the new version instead.
+$versionLabel = "version unknown"
+if ($InstalledCommit) {
+    $versionLabel = "version " + $InstalledCommit.Substring(0, 7)
+}
+
+# Shown once per run; the restart after a self-update confirms it instead.
 if ($SelfUpdated) {
-    Write-Host "Restarted with Start.ps1 v$StartVersion." -ForegroundColor Green
+    Write-Host "Restarted with the new Start.ps1." -ForegroundColor Green
     Write-Host ""
 }
 else {
     Write-Host ""
-    Write-Host "Welcome to powershellRepo v$StartVersion, $env:USERNAME!" -ForegroundColor Cyan
+    Write-Host "Welcome to powershellRepo ($versionLabel), $env:USERNAME!" -ForegroundColor Cyan
     if (-not $SkipUpdate) {
         Write-Host "Checking GitHub for updates..." -ForegroundColor DarkGray
     }
@@ -132,7 +141,8 @@ if (-not $SkipUpdate) {
     try {
         # Ask GitHub for the latest commit and the hash of every file in it,
         # so only the files that changed are downloaded.
-        $CommitSha = Invoke-RestMethod -Uri "$ApiBase/commits/$Branch" -Headers ($Headers + @{ Accept = "application/vnd.github.sha" })
+        $commit = Invoke-RestMethod -Uri "$ApiBase/commits/$Branch" -Headers $Headers
+        $CommitSha = $commit.sha
         $tree = Invoke-RestMethod -Uri "$ApiBase/git/trees/${CommitSha}?recursive=1" -Headers $Headers
         $RemoteHashes = @{}
         $tree.tree | Where-Object { $_.type -eq "blob" } | ForEach-Object { $RemoteHashes[$_.path] = $_.sha }
@@ -148,6 +158,13 @@ if (-not $SkipUpdate) {
 
             if (-not $configChanged -and $changed.Count -eq 0) {
                 Write-Host "Everything is up to date."
+            }
+
+            if ($CommitSha -ne $InstalledCommit) {
+                Set-Content -Path $VersionPath -Value $CommitSha -Encoding ascii
+                $date = ([datetime]$commit.commit.committer.date).ToLocalTime().ToString("yyyy-MM-dd HH:mm")
+                $message = ($commit.commit.message -split "`n")[0]
+                Write-Host "Now on version $($CommitSha.Substring(0, 7)) ($date): $message" -ForegroundColor Green
             }
         }
     }
