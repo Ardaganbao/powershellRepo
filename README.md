@@ -50,7 +50,7 @@ To add a script to the manager, add its name to both `Files` and `Scripts` in `u
 irm https://raw.githubusercontent.com/Ardaganbao/powershellRepo/main/Start.ps1 | iex
 ```
 
-This saves `Start.ps1` to `$HOME\powershellRepo`, downloads the other scripts there and runs them. Run the same line again any time, or afterwards just run `& "$HOME\powershellRepo\Start.ps1"`.
+This saves `Start.ps1` to `$HOME\powershellRepo`, downloads the other scripts there and opens the Script Manager. Run the same line again any time to update and open it. To run the turned-on scripts without the window, use `& "$HOME\powershellRepo\Start.ps1"`.
 
 To install to another folder:
 

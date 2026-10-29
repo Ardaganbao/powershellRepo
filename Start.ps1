@@ -34,13 +34,13 @@ param(
 
 # Started from the one-liner (irm ... | iex): there is no file yet, so save Start.ps1
 # into $InstallPath and run it from there in a new process, which keeps this session
-# clean and works whatever the execution policy is.
+# clean and works whatever the execution policy is. It then opens the Script Manager.
 if (-not $PSCommandPath) {
     New-Item -ItemType Directory -Path $InstallPath -Force | Out-Null
     $startPath = Join-Path $InstallPath "Start.ps1"
     Invoke-WebRequest -Uri "https://raw.githubusercontent.com/$Owner/$Repository/$Branch/Start.ps1" -OutFile $startPath -UseBasicParsing -Headers @{ "User-Agent" = "PowerShell-Updater" }
     Write-Host "Installed to $InstallPath"
-    & (Get-Process -Id $PID).Path -NoProfile -ExecutionPolicy Bypass -File $startPath -Owner $Owner -Repository $Repository -Branch $Branch
+    & (Get-Process -Id $PID).Path -NoProfile -ExecutionPolicy Bypass -File $startPath -Owner $Owner -Repository $Repository -Branch $Branch -Gui
     return
 }
 
