@@ -24,7 +24,11 @@ param(
     [Parameter()]
     [switch]$Gui,
 
-    # Set internally when the script restarts after updating itself.
+    # Set internally when the script restarts after all updates were downloaded.
+    [Parameter(DontShow)]
+    [switch]$UpdatesApplied,
+
+    # Set by older versions, which restart before downloading the other files.
     [Parameter(DontShow)]
     [switch]$SelfUpdated
 )
@@ -57,8 +61,9 @@ if (Test-Path $VersionPath) {
 
 # Shown once per run; the restart after a self-update confirms it instead.
 # The version is shown after the update check, so it is always the one actually running.
-if ($SelfUpdated) {
+if ($UpdatesApplied -or $SelfUpdated) {
     Write-Host "Restarted with the new Start.ps1." -ForegroundColor Green
+    Write-Host ""
 }
 else {
     Write-Host ""
@@ -143,7 +148,7 @@ function Update-RepoFile {
     }
 }
 
-if (-not $SkipUpdate) {
+if (-not $SkipUpdate -and -not $UpdatesApplied) {
     $restart = $false
 
     try {
@@ -155,40 +160,38 @@ if (-not $SkipUpdate) {
         $RemoteHashes = @{}
         $tree.tree | Where-Object { $_.type -eq "blob" } | ForEach-Object { $RemoteHashes[$_.path] = $_.sha }
 
-        # 1. Update this script first; the new version takes over from here.
+        # 1. Download every update first: this script, the config, then every file it lists.
         $restart = -not $SelfUpdated -and (Update-RepoFile -Name (Split-Path -Leaf $PSCommandPath))
+        $configChanged = Update-RepoFile -Name "updater.config.json"
+        $config = Get-Content -Path (Join-Path $PSScriptRoot "updater.config.json") -Raw | ConvertFrom-Json
+        $changed = @($config.Files | Where-Object { Update-RepoFile -Name $_ })
 
-        if (-not $restart) {
-            # 2. Update the config, then every file it lists.
-            $configChanged = Update-RepoFile -Name "updater.config.json"
-            $config = Get-Content -Path (Join-Path $PSScriptRoot "updater.config.json") -Raw | ConvertFrom-Json
-            $changed = @($config.Files | Where-Object { Update-RepoFile -Name $_ })
-
-            if (-not $configChanged -and $changed.Count -eq 0) {
-                Write-Host "Everything is up to date."
-            }
-
-            $date = ([datetime]$commit.commit.committer.date).ToLocalTime().ToString("yyyy-MM-dd HH:mm")
-            $message = ($commit.commit.message -split "`n")[0]
-            $versionText = "version $($CommitSha.Substring(0, 7)) ($date): $message"
-
-            if ($CommitSha -ne $InstalledCommit) {
-                Set-Content -Path $VersionPath -Value $CommitSha -Encoding ascii
-                Write-Host "Updated to $versionText" -ForegroundColor Green
-            }
-            else {
-                Write-Host "Running $versionText" -ForegroundColor DarkGray
-            }
-            Write-Host ""
+        if (-not $restart -and -not $configChanged -and $changed.Count -eq 0) {
+            Write-Host "Everything is up to date."
         }
+
+        $date = ([datetime]$commit.commit.committer.date).ToLocalTime().ToString("yyyy-MM-dd HH:mm")
+        $message = ($commit.commit.message -split "`n")[0]
+        $versionText = "version $($CommitSha.Substring(0, 7)) ($date): $message"
+
+        if ($CommitSha -ne $InstalledCommit) {
+            Set-Content -Path $VersionPath -Value $CommitSha -Encoding ascii
+            Write-Host "Updated to $versionText" -ForegroundColor Green
+        }
+        else {
+            Write-Host "Running $versionText" -ForegroundColor DarkGray
+        }
+        Write-Host ""
     }
     catch {
         Write-Warning "Update check failed, running the local version: $($_.Exception.Message)"
     }
 
+    # 2. If this script changed, restart so the new version runs the scripts.
+    #    The other scripts are read from disk when they run, so they need no restart.
     if ($restart) {
-        Write-Host "Entry point updated, restarting with the new version..."
-        & $PSCommandPath @PSBoundParameters -SelfUpdated
+        Write-Host "Start.ps1 was updated, restarting with the new version..." -ForegroundColor Green
+        & $PSCommandPath @PSBoundParameters -UpdatesApplied
         return
     }
 }
@@ -203,6 +206,7 @@ if ($Gui) {
 }
 
 # 3. Run every script in the config that is turned on; Manager.ps1 turns them on and off.
+Write-Host "Running scripts..." -ForegroundColor DarkGray
 $config = Get-Content -Path (Join-Path $PSScriptRoot "updater.config.json") -Raw | ConvertFrom-Json
 $statePath = Join-Path $PSScriptRoot "scripts.local.json"
 $turnedOff = @()
