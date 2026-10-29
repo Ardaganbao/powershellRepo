@@ -16,6 +16,6 @@ if [ -n "$matches" ]; then
     echo "Commit blocked: possible password or secret in staged changes:"
     echo "$matches"
     echo ""
-    echo "Remove it and read it from an environment variable instead (e.g. \$env:MY_PASSWORD)."
+    echo "Remove it and read it from the vault instead, e.g. Get-Secret -Name MyPassword"
     exit 1
 fi

@@ -57,18 +57,47 @@ The first `.zip` or `.ps1` asset of the latest release is used. If there is no r
 .\SampleScript.ps1 -Update
 ```
 
-## Private repositories
+## Passwords and secrets
 
-Create a GitHub personal access token with read access to the repository's contents, then set it before running the updater:
+This repository is public. Never put passwords, tokens or keys in the scripts. Store them in the local SecretManagement vault and read them with `Get-Secret`.
+
+One-time setup on each computer:
 
 ```powershell
-$env:GITHUB_TOKEN = "github_pat_..."
-.\Update-FromGitHub.ps1
+Install-Module Microsoft.PowerShell.SecretManagement, Microsoft.PowerShell.SecretStore -Scope CurrentUser
+Register-SecretVault -Name LocalStore -ModuleName Microsoft.PowerShell.SecretStore -DefaultVault
+```
+
+Store a secret (you type the value at the prompt, so it never appears in a script or the command history). The first time, you also choose the vault password:
+
+```powershell
+Set-Secret -Name MyPassword                      # a plain password
+Set-Secret -Name MyLogin -Secret (Get-Credential) # a user name + password
+```
+
+Use it in a script:
+
+```powershell
+$password   = Get-Secret -Name MyPassword               # SecureString
+$credential = Get-Secret -Name MyLogin                  # PSCredential, e.g. -Credential $credential
+$plain      = Get-Secret -Name MyPassword -AsPlainText  # only when an API needs plain text
+```
+
+Useful commands: `Get-SecretInfo` (list names), `Remove-Secret -Name MyPassword`, `Unlock-SecretStore` (unlock the vault at the start of a session).
+
+### Private repositories
+
+Store a GitHub personal access token with read access to the repository's contents in the vault, then put its name in `updater.config.json`:
+
+```powershell
+Set-Secret -Name GitHubToken
+```
+
+```json
+"TokenSecretName": "GitHubToken"
 ```
 
 ## Never commit passwords
-
-This repository is public. Never put passwords, tokens or keys in the scripts; read them from environment variables instead (for example `$env:GITHUB_TOKEN`).
 
 A pre-commit hook blocks commits that look like they contain a secret. Enable it once in every clone:
 

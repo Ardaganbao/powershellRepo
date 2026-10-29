@@ -241,10 +241,16 @@ if (-not $Owner -or -not $Repository -or $Owner -eq "your-github-user" -or $Repo
     throw "GitHub repository is not configured. Set Owner and Repository in $ConfigPath or pass -Owner and -Repository."
 }
 
-# Set GITHUB_TOKEN to update from a private repository.
+# For a private repository, set TokenSecretName in the config to read the token
+# from the SecretManagement vault, or set GITHUB_TOKEN.
 $headers = @{ "User-Agent" = "PowerShell-Updater" }
-if ($env:GITHUB_TOKEN) {
-    $headers["Authorization"] = "Bearer $env:GITHUB_TOKEN"
+$token = $env:GITHUB_TOKEN
+$tokenSecretName = Get-ConfigValue -Config $config -Name "TokenSecretName" -Default $null
+if (-not $token -and $tokenSecretName) {
+    $token = Get-Secret -Name $tokenSecretName -AsPlainText
+}
+if ($token) {
+    $headers["Authorization"] = "Bearer $token"
 }
 
 if (-not (Test-Path $TargetFolder)) {

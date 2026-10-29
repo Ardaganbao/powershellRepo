@@ -2,6 +2,7 @@
     "Owner": "Ardaganbao",
     "Repository": "powershellRepo",
     "Branch": "main",
+    "TokenSecretName": "",
     "Files": [
         "SampleScript.ps1",
         "Update-FromGitHub.ps1"
