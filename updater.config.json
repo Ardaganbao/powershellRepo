@@ -1,0 +1,9 @@
+{
+    "Owner": "Ardaganbao",
+    "Repository": "powershellRepo",
+    "Branch": "main",
+    "Files": [
+        "SampleScript.ps1",
+        "Update-FromGitHub.ps1"
+    ]
+}
