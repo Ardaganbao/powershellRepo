@@ -9,6 +9,10 @@ param(
     [Parameter()]
     [string]$Branch = "main",
 
+    # Where the one-liner installs the scripts.
+    [Parameter()]
+    [string]$InstallPath = (Join-Path $HOME "powershellRepo"),
+
     [Parameter()]
     [switch]$SkipUpdate,
 
@@ -17,12 +21,24 @@ param(
     [switch]$SelfUpdated
 )
 
+# GitHub requires TLS 1.2; Windows PowerShell 5.1 may not enable it by default.
+[Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+
+# Started from the one-liner (irm ... | iex): there is no file yet, so save Start.ps1
+# into $InstallPath and run it from there in a new process, which keeps this session
+# clean and works whatever the execution policy is.
+if (-not $PSCommandPath) {
+    New-Item -ItemType Directory -Path $InstallPath -Force | Out-Null
+    $startPath = Join-Path $InstallPath "Start.ps1"
+    Invoke-WebRequest -Uri "https://raw.githubusercontent.com/$Owner/$Repository/$Branch/Start.ps1" -OutFile $startPath -UseBasicParsing -Headers @{ "User-Agent" = "PowerShell-Updater" }
+    Write-Host "Installed to $InstallPath"
+    & (Get-Process -Id $PID).Path -NoProfile -ExecutionPolicy Bypass -File $startPath -Owner $Owner -Repository $Repository -Branch $Branch
+    return
+}
+
 $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
 Set-StrictMode -Version Latest
-
-# GitHub requires TLS 1.2; Windows PowerShell 5.1 may not enable it by default.
-[Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
 
 $RawBase = "https://raw.githubusercontent.com/$Owner/$Repository/$Branch"
 

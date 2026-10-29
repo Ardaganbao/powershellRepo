@@ -23,14 +23,18 @@ Every run:
 
 If GitHub can't be reached, it shows a warning and runs the local versions. Use `.\Start.ps1 -SkipUpdate` to run without checking for updates.
 
-### Install on a new computer
-
-Only `Start.ps1` is needed; it downloads everything else on the first run:
+### Install and run with one line
 
 ```powershell
-mkdir C:\Scripts; cd C:\Scripts
-Invoke-WebRequest https://raw.githubusercontent.com/Ardaganbao/powershellRepo/main/Start.ps1 -OutFile Start.ps1
-.\Start.ps1
+irm https://raw.githubusercontent.com/Ardaganbao/powershellRepo/main/Start.ps1 | iex
+```
+
+This saves `Start.ps1` to `$HOME\powershellRepo`, downloads the other scripts there and runs them. Run the same line again any time, or afterwards just run `& "$HOME\powershellRepo\Start.ps1"`.
+
+To install to another folder:
+
+```powershell
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/Ardaganbao/powershellRepo/main/Start.ps1))) -InstallPath C:\Scripts
 ```
 
 To add a script, put it in the repository and add its name to `Files` in `updater.config.json`.
