@@ -63,6 +63,12 @@ if ($SelfUpdated) {
 else {
     Write-Host ""
     Write-Host "Welcome to powershellRepo, $env:USERNAME!" -ForegroundColor Cyan
+    Write-Host "This keeps your scripts up to date from GitHub and runs the ones that are turned on."
+    Write-Host ""
+    Write-Host "  .\Start.ps1 -Gui         Open the Script Manager to turn scripts on/off and run them" -ForegroundColor DarkGray
+    Write-Host "  .\Start.ps1 -UpdateOnly  Update without running anything" -ForegroundColor DarkGray
+    Write-Host "  .\Start.ps1 -SkipUpdate  Run without checking GitHub" -ForegroundColor DarkGray
+    Write-Host ""
     if ($SkipUpdate) {
         $versionLabel = "unknown"
         if ($InstalledCommit) {
